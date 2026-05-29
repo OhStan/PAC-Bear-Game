@@ -8,3 +8,4 @@ This is an output of the WGU AWS Game Dev Event! Most of the heavy lifting (codi
 
 Special thanks to AWS solutions team to hosting the event! 
 
+The project is live at: https://pac-bear-game.onrender.com
