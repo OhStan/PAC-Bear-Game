@@ -61,14 +61,26 @@ const ScoreManager = {
   isNewHighScore: false,
   playerName: '',   // set to a non-empty string to use a custom name; defaults to 'Anonymous'
 
-  load() {
+  async load() {
     try {
-      const raw = localStorage.getItem('pac-bear-high-score');
-      const parsed = parseInt(raw, 10);
-      this.highScore = isNaN(parsed) ? 0 : parsed;
+      const res = await fetch('/api/scores?limit=1');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          this.highScore = data[0].score; // Set high score to the top DB entry
+          console.log("Loaded high score from db, ", this.highScore);
+          updateHUD(); // Refresh the screen text
+        } else {
+          this.highScore = 0;
+        }
+      } else {
+        this.highScore = 0;
+      }
     } catch (e) {
+      console.log("Could not fetch high score from server, using 0.");
       this.highScore = 0;
     }
+    updateHUD();
   },
 
   checkAndSave(score) {
@@ -98,9 +110,12 @@ const ScoreManager = {
         signal:  controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  
+      await this.load();
+      
     } catch (_err) {
       // Network error, timeout, or non-2xx — fall back to localStorage silently
-      try { localStorage.setItem('pac-bear-high-score', score); } catch (_) { /* ignore */ }
+      //try { localStorage.setItem('pac-bear-high-score', score); } catch (_) { /* ignore */ }
     } finally {
       clearTimeout(timeoutId);
     }
@@ -477,6 +492,12 @@ function checkGhostCollision() {
         ParticleSystem.spawnExplosion(player.col * CELL + CELL / 2, player.row * CELL + CELL / 2, ['#ff4444'], count);
         if (lives <= 0) {
           const isNew = ScoreManager.checkAndSave(score);
+          
+          // Prompt for name if they hit a high score or just generally want to submit
+          let name = prompt("Game Over! Enter your name for the leaderboard:", "Anonymous");
+          if (!name || !name.trim()) name = "Anonymous";
+          ScoreManager.playerName = name.slice(0, 50);
+
           ScoreManager.submitScore(score); // non-blocking; falls back to localStorage on error
           if (isNew) ParticleSystem.spawnConfetti();
           ParticleSystem.clearExplosions();
@@ -698,11 +719,14 @@ function drawOverlay() {
     ctx.textAlign   = 'center';
 
     if (ScoreManager.isNewHighScore) {
-      ctx.fillStyle   = '#c084fc';
-      ctx.font        = 'bold 16px Courier New';
+      ctx.fillStyle   = '#39FF14';
+      ctx.font        = 'bold 24px Courier New';
+      ctx.fillText(`Player: ${ScoreManager.playerName}`, canvas.width / 2, canvas.height / 2 + 70); // Added line
+      ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 100); // Shifted down slightly
+
       ctx.shadowColor = '#c084fc';
       ctx.shadowBlur  = 14;
-      ctx.fillText('✨ NEW HIGH SCORE! ✨', canvas.width / 2, canvas.height / 2 - 48);
+      ctx.fillText('✨ NEW HIGH SCORE! ✨', canvas.width / 2, canvas.height / 2 - 50);
       ctx.shadowBlur  = 0;
     }
 
@@ -780,6 +804,8 @@ function gameLoop() {
 }
 
 // ── Boot ─────────────────────────────────────────────────────
-ScoreManager.load(); // read persisted high score once on page load
-initGame();
-gameLoop();
+// Wait for the server to return the high score FIRST, then start the game loop
+ScoreManager.load().then(() => {
+  initGame();
+  gameLoop();
+});
