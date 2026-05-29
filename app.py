@@ -123,8 +123,10 @@ def submit_score():
     if player_name is None or not isinstance(player_name, str) or not player_name.strip():
         return jsonify({'error': 'player_name must not be empty'}), 400
     player_name = player_name.strip()
+    
     if len(player_name) > 50:
-        return jsonify({'error': 'player_name must be 50 characters or fewer'}), 400
+        player_name = player_name[:50]
+
 
     # Validate score
     score = data.get('score')
@@ -207,7 +209,9 @@ def handle_bad_request(exc):
 
 # ── Boot ─────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    init_db()
-    log.info("Starting PAC-BEAR server on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
+init_db()
+
+if __name__ == '__main__': 
+    port = int(os.environ.get("PORT", 5000))
+    log.info(f"Starting PAC-BEAR server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=DEBUG_MODE)
